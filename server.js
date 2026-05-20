@@ -29,12 +29,50 @@ function getJSON(urlString) {
 
 // Geocode postal code + country → { lat, lon, name, timezone }
 async function geocodeLocation(postalCode, country) {
-  const geoUrl = `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&countrycodes=${encodeURIComponent(country.toUpperCase())}&format=json&limit=1`;
-  const geo = await getJSON(geoUrl);
+  const country2 = country.toUpperCase();
+  const countryLower = country.toLowerCase();
+
+  // Strategy 1: Try exact postal code + country code
+  let geo = await getJSON(
+    `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&countrycodes=${encodeURIComponent(country2)}&format=json&limit=5`
+  );
+
+  // Strategy 2: Try postal code + country name
+  if (!geo || geo.length === 0) {
+    geo = await getJSON(
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&countrycodes=Mexico&format=json&limit=5`
+    );
+  }
+
+  // Strategy 3: Search postal code without country, prefer matching country
+  if (!geo || geo.length === 0) {
+    geo = await getJSON(
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&format=json&limit=20`
+    );
+  }
+
+  // Strategy 4: General text search for the postal code in the country
+  if (!geo || geo.length === 0) {
+    geo = await getJSON(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(postalCode + ' ' + country)}&format=json&limit=10`
+    );
+  }
+
   if (!geo || geo.length === 0) {
     throw new Error('Location not found');
   }
-  const r = geo[0];
+
+  // Prefer a match in the requested country
+  let r = geo.find(item => {
+    const dn = item.display_name.toLowerCase();
+    return dn.includes(country2.toLowerCase()) ||
+           dn.includes(countryLower) ||
+           dn.includes('mexico') ||
+           dn.includes('m\u00e9xico') ||
+           dn.includes('mex');
+  });
+  if (!r) r = geo[0]; // Fall back to first result
+
   const lat = parseFloat(r.lat);
   const lon = parseFloat(r.lon);
 
