@@ -28,33 +28,47 @@ function getJSON(urlString) {
 }
 
 // Geocode postal code + country → { lat, lon, name, timezone }
+// Uses GeoNames (postal code database) as primary, Nominatim as fallback
 async function geocodeLocation(postalCode, country) {
-  const country2 = country.toUpperCase();
-  const countryLower = country.toLowerCase();
+  // Normalize country code to 2-letter (GeoNames requires this)
+  const country2 = alpha3to2(country.trim());
 
-  // Strategy 1: Try exact postal code + country code
+  // Strategy 1: GeoNames postal code lookup (primary - most accurate for postal codes)
+  let geonames = await getJSON(
+    `https://secure.geonames.org/postalCodeSearchJSON?postalcode=${encodeURIComponent(postalCode)}&country=${encodeURIComponent(country2)}&username=free&style=FULL`
+  );
+
+  if (geonames && geonames.postalCodes && geonames.postalCodes.length > 0) {
+    // Use the first result
+    const g = geonames.postalCodes[0];
+    const lat = parseFloat(g.lat);
+    const lon = parseFloat(g.lng);
+
+    // Resolve timezone via Open-Meteo
+    let timezone = 'UTC';
+    try {
+      const tzInfo = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto`);
+      timezone = tzInfo.timezone || 'UTC';
+    } catch (e) {
+      console.warn(`Could not resolve timezone for ${lat},${lon}: ${e.message}`);
+    }
+
+    // Build name from GeoNames data
+    let name = g.placeName;
+    if (g.adminName2) name += `, ${g.adminName2}`;
+    if (g.adminName1) name += `, ${g.adminName1}`;
+
+    return { lat, lon, name, timezone };
+  }
+
+  // Strategy 2: Nominatim fallback (broader coverage, less postal-code-specific)
   let geo = await getJSON(
     `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&countrycodes=${encodeURIComponent(country2)}&format=json&limit=5`
   );
 
-  // Strategy 2: Try postal code + country name
-  if (!geo || geo.length === 0) {
-    geo = await getJSON(
-      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&countrycodes=Mexico&format=json&limit=5`
-    );
-  }
-
-  // Strategy 3: Search postal code without country, prefer matching country
   if (!geo || geo.length === 0) {
     geo = await getJSON(
       `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postalCode)}&format=json&limit=20`
-    );
-  }
-
-  // Strategy 4: General text search for the postal code in the country
-  if (!geo || geo.length === 0) {
-    geo = await getJSON(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(postalCode + ' ' + country)}&format=json&limit=10`
     );
   }
 
@@ -63,15 +77,7 @@ async function geocodeLocation(postalCode, country) {
   }
 
   // Prefer a match in the requested country
-  let r = geo.find(item => {
-    const dn = item.display_name.toLowerCase();
-    return dn.includes(country2.toLowerCase()) ||
-           dn.includes(countryLower) ||
-           dn.includes('mexico') ||
-           dn.includes('m\u00e9xico') ||
-           dn.includes('mex');
-  });
-  if (!r) r = geo[0]; // Fall back to first result
+  let r = geo[0]; // Use first result
 
   const lat = parseFloat(r.lat);
   const lon = parseFloat(r.lon);
