@@ -436,6 +436,32 @@
       .details-grid { grid-template-columns: 1fr 1fr; }
     }
 
+    /* Temp unit toggle */
+    .unit-toggle {
+      display: flex;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .unit-btn {
+      background: var(--card);
+      color: var(--text-dim);
+      border: none;
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .unit-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+    .unit-btn:hover:not(.active) {
+      background: var(--card-hover);
+    }
+
     /* Search bar */
     .search-bar {
       display: flex;
@@ -533,6 +559,10 @@
   <div class="container" id="app">
     <!-- Search Bar (always visible) -->
     <div class="search-bar">
+      <div class="unit-toggle">
+        <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
+        <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+      </div>
       <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
       <select id="countrySelect"></select>
       <button class="search-btn" onclick="searchWeather()">🔍</button>
@@ -550,6 +580,25 @@
     const CLIENT_LAT = 29.4241;
     const CLIENT_LON = -98.4936;
     const CLIENT_TZ = 'America/Chicago';
+
+    // Temperature unit state
+    let TEMP_UNIT = localStorage.getItem('weather_unit') || 'F';
+
+    function setUnit(unit) {
+      TEMP_UNIT = unit;
+      localStorage.setItem('weather_unit', unit);
+      document.getElementById('unitF').classList.toggle('active', unit === 'F');
+      document.getElementById('unitC').classList.toggle('active', unit === 'C');
+      // Re-render current data if available
+      if (window._lastWeatherData) render(window._lastWeatherData);
+    }
+
+    function fToC(f) { return ((f - 32) * 5 / 9).toFixed(1); }
+    function displayTemp(f) {
+      if (TEMP_UNIT === 'C') return fToC(f);
+      return Math.round(f);
+    }
+    function unitLabel() { return TEMP_UNIT === 'F' ? '°F' : '°C'; }
 
     // Countries sorted alphabetically by name: [name, 3-letter code, emoji flag]
     const COUNTRIES = [
@@ -878,9 +927,9 @@
             <div class="day-name">${formatDay(t)}</div>
             <div class="day-icon">${w.icon}</div>
             <div class="day-temps">
-              <span class="day-high">${Math.round(todayDaily.temperature_2m_max[i])}°</span>
+              <span class="day-high">${displayTemp(todayDaily.temperature_2m_max[i])}°</span>
               <span style="color:var(--text-dim);margin:0 4px;">/</span>
-              <span class="day-low">${Math.round(todayDaily.temperature_2m_min[i])}°</span>
+              <span class="day-low">${displayTemp(todayDaily.temperature_2m_min[i])}°</span>
             </div>
             ${precip > 0 ? `<div class="day-precip">💧 ${precip}%</div>` : ''}
           </div>
@@ -899,7 +948,7 @@
           <div class="hourly-item ${isNow ? 'now' : ''}">
             <div class="h-time">${isNow ? 'Now' : formatHour(t)}</div>
             <div class="h-icon">${w.icon}</div>
-            <div class="h-temp">${Math.round(temp)}°</div>
+            <div class="h-temp">${displayTemp(temp)}°</div>
             ${precipProb > 0 ? `<div class="h-precip">💧 ${precipProb}%</div>` : '<div style="height:16px"></div>'}
           </div>
         `;
@@ -914,6 +963,10 @@
         <div class="fade-in">
           <!-- Search Bar -->
           <div class="search-bar">
+            <div class="unit-toggle">
+              <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
+              <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+            </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
             <select id="countrySelect"></select>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
@@ -937,15 +990,15 @@
             <div class="current-left">
               <div class="weather-icon-lg">${currentWeather.icon}</div>
               <div>
-                <div class="temp-main">${Math.round(current.temperature_2m)}<span>°F</span></div>
+                <div class="temp-main">${displayTemp(current.temperature_2m)}<span>${unitLabel()}</span></div>
                 <div class="condition-text">${currentWeather.label}</div>
               </div>
             </div>
             <div class="current-right">
-              <div class="feels-like">Feels like <strong>${Math.round(current.apparent_temperature)}°F</strong></div>
+              <div class="feels-like">Feels like <strong>${displayTemp(current.apparent_temperature)}°</strong></div>
               <div class="high-low">
-                <span class="high">H: ${Math.round(todayMax)}°</span> &nbsp;·&nbsp;
-                <span class="low">L: ${Math.round(todayMin)}°</span>
+                <span class="high">H: ${displayTemp(todayMax)}°</span> &nbsp;·&nbsp;
+                <span class="low">L: ${displayTemp(todayMin)}°</span>
               </div>
             </div>
           </div>
@@ -988,7 +1041,7 @@
             <div class="detail-card">
               <div class="icon">🌡️</div>
               <div class="label">Heat Index</div>
-              <div class="value">${Math.round(current.apparent_temperature)}<span style="font-size:0.8rem">°F</span></div>
+              <div class="value">${displayTemp(current.apparent_temperature)}<span style="font-size:0.8rem">°</span></div>
               <div class="sub">${current.apparent_temperature > current.temperature_2m + 3 ? 'Hotter' : current.apparent_temperature < current.temperature_2m - 3 ? 'Cooler' : 'Similar'}</div>
             </div>
           </div>
@@ -1020,6 +1073,10 @@
         <div class="fade-in">
           <!-- Search Bar -->
           <div class="search-bar">
+            <div class="unit-toggle">
+              <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
+              <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+            </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
             <select id="countrySelect"></select>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
@@ -1039,7 +1096,7 @@
             <div class="current-left">
               <div class="weather-icon-lg">📍</div>
               <div>
-                <div class="temp-main">—<span>°F</span></div>
+                <div class="temp-main">—<span>${unitLabel()}</span></div>
                 <div class="condition-text">Enter a postal code to get started</div>
               </div>
             </div>
@@ -1144,7 +1201,8 @@
       el.textContent = `Live · Updated ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
     }
 
-    // Initial load
+    // Initial load - apply saved unit
+    setUnit(TEMP_UNIT);
     loadWeather();
 
     // Auto-refresh every 10 minutes

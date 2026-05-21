@@ -1,0 +1,102 @@
+name: Build & Deploy Weather Dashboard
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # manual trigger
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ─── Build & Push to GHCR ───
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Deploy to server ───
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script: |
+            set -e
+
+            # ── Configuration ──
+            IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+            COMMIT_SHA="${{ github.sha }}"
+            CONTAINER_NAME="weather-dashboard"
+
+            echo "🔄 Pulling latest image: ${IMAGE}:${COMMIT_SHA}"
+
+            # Login to GHCR on the server
+            echo "${{ secrets.GITHUB_TOKEN }}" | \
+              docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+            # Pull the new image
+            docker pull "${IMAGE}:${COMMIT_SHA}"
+
+            # Gracefully stop old container
+            docker stop "${CONTAINER_NAME}" 2>/dev/null || true
+            docker rm "${CONTAINER_NAME}" 2>/dev/null || true
+
+            # Remove dangling old images
+            docker image prune -f
+
+            # Start new container
+            docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --restart unless-stopped \
+              -p 8040:8040 \
+              --health-cmd "wget --spider -q http://localhost:8040/api/weather || exit 1" \
+              --health-interval 30s \
+              --health-timeout 10s \
+              --health-retries 3 \
+              --health-start-period 10s \
+              -e PORT=8040 \
+              "${IMAGE}:${COMMIT_SHA}"
+
+            echo "✅ Deployed ${IMAGE}:${COMMIT_SHA}"
+            echo "📍 URL: http://<your-server-ip>:8040"
+            docker ps --filter "name=${CONTAINER_NAME}"

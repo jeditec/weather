@@ -1,0 +1,19 @@
+services:
+  weather-dashboard:
+    build: .
+    container_name: weather-dashboard
+    restart: unless-stopped
+    ports:
+      - "8040:8040"
+    environment:
+      - PORT=8040
+      # ── Optional: override defaults via env vars ──
+      # - DEFAULT_LAT=29.4241
+      # - DEFAULT_LON=-98.4936
+      # - DEFAULT_TZ=America/Chicago
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8040/api/weather"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
