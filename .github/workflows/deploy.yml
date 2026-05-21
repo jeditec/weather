@@ -58,20 +58,11 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check deploy configuration
-        run: |
-          if [ -z "${{ secrets.DEPLOY_HOST }}" ]; then
-            echo "⏭️ Skipping deploy - DEPLOY_HOST secret not configured"
-            echo "Deploy requires secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY"
-            exit 0
-          fi
-          echo "✅ Deploy configured, proceeding..."
-
       - name: Deploy via SSH
-        if: ${{ secrets.DEPLOY_HOST != '' }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.DEPLOY_HOST || 'skip-deploy' }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_PORT || 22 }}
