@@ -1069,6 +1069,8 @@
           </div>
         </div>
       `;
+      // Restore correct active unit button after re-render
+      setTimeout(() => setUnit(TEMP_UNIT), 0);
       // Populate country dropdown after DOM update
       setTimeout(populateCountrySelect, 10);
     }
@@ -1109,6 +1111,7 @@
           </div>
         </div>
       `;
+      setTimeout(() => setUnit(TEMP_UNIT), 0);
       setTimeout(populateCountrySelect, 10);
     }
 
