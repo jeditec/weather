@@ -486,8 +486,12 @@
       border-color: var(--accent);
     }
     .search-bar input::placeholder {
-      color: var(--text-dim);
+      color: rgba(161, 161, 170, 0.5);
       opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+    .search-bar input:focus::placeholder {
+      opacity: 0;
     }
     .search-bar select {
       background: var(--card);
