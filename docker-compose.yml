@@ -1,15 +1,10 @@
 services:
-  # ──────────────────────────────────────────────────
-  # Weather Dashboard App (Node.js)
-  # ──────────────────────────────────────────────────
   weather-dashboard:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: weather-dashboard
     restart: unless-stopped
-    expose:
-      - "8040"
+    ports:
+      - "8040:8040"
     environment:
       - PORT=8040
       # ── Optional: override defaults via env vars ──
@@ -22,60 +17,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    networks:
-      - app-network
-
-  # ──────────────────────────────────────────────────
-  # Nginx Reverse Proxy (optional)
-  # ──────────────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-proxy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    depends_on:
-      - weather-dashboard
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # ──────────────────────────────────────────────────
-  # Certbot (Let's Encrypt SSL)
-  # ──────────────────────────────────────────────────
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: ""
-    command: "sleep infinity"
-    depends_on:
-      - nginx
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
-
-# ──────────────────────────────────────────────────
-# ── Quick Start ──
-# ──────────────────────────────────────────────────
-# 1. Docker Compose (no SSL):
-#      docker compose up -d --build
-#
-# 2. With SSL:
-#      docker compose up -d --build nginx weather-dashboard
-#      docker compose exec certbot certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
-#      docker compose restart nginx
