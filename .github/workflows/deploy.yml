@@ -2,7 +2,7 @@ name: Build & Deploy Weather Dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch: # manual trigger
 
 env:
