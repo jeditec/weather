@@ -591,9 +591,11 @@
     function setUnit(unit) {
       TEMP_UNIT = unit;
       localStorage.setItem('weather_unit', unit);
-      document.getElementById('unitF').classList.toggle('active', unit === 'F');
-      document.getElementById('unitC').classList.toggle('active', unit === 'C');
-      // Re-render current data if available
+      // Update all unit buttons in the page
+      document.querySelectorAll('#unitF, #unitC').forEach(btn => {
+        btn.classList.toggle('active', btn.id === `unit${unit}`);
+      });
+      // Re-render current data immediately
       if (window._lastWeatherData) render(window._lastWeatherData);
     }
 
@@ -1138,6 +1140,7 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        window._lastWeatherData = data;
         render(data);
         updateRefreshTime();
       } catch (err) {
@@ -1178,6 +1181,7 @@
         }
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        window._lastWeatherData = data;
         render(data);
         updateRefreshTime();
         if (errorEl) {
