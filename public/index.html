@@ -845,7 +845,7 @@
     let countryFilterText = '';
     let countryFilterTimer = null;
 
-    document.addEventListener('keydown', (e) => {
+    function applyCountryFilter(e) {
       const select = document.getElementById('countrySelect');
       if (!select) return;
 
@@ -876,7 +876,7 @@
           select.value = options[idx].value;
         }
       }
-    });
+    }
 
 
     // WMO Weather code mapping
@@ -1282,11 +1282,11 @@
       if (postalInput) {
         postalInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
       }
-      // Focus country select to enable keyboard filtering
       if (countrySelect) {
         countrySelect.addEventListener('focus', () => {
           countryFilterText = '';
         });
+        countrySelect.addEventListener('keydown', applyCountryFilter);
       }
     });
 
