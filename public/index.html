@@ -519,6 +519,64 @@
       color: var(--text);
       padding: 8px;
     }
+    .country-wrapper {
+      position: relative;
+      min-width: 180px;
+    }
+    .country-input {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 0.85rem;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+    .country-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .country-input::placeholder {
+      color: rgba(161, 161, 170, 0.5);
+      opacity: 0.5;
+    }
+    #countrySelect {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
+    }
+    .country-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #1a1a2e;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 4px 0;
+      z-index: 100;
+      display: none;
+      margin-top: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .country-list li {
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      transition: background 0.15s;
+    }
+    .country-list li:hover {
+      background: rgba(96, 165, 250, 0.15);
+    }
+    .country-list li strong {
+      color: var(--accent);
+    }
     .search-bar .search-btn {
       background: var(--accent);
       color: white;
@@ -568,7 +626,11 @@
         <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
       </div>
       <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-      <select id="countrySelect"></select>
+      <div id="countryWrapper" class="country-wrapper">
+        <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
+        <select id="countrySelect"></select>
+        <ul id="countryList" class="country-list"></ul>
+      </div>
       <button class="search-btn" onclick="searchWeather()">🔍</button>
       <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
     </div>
@@ -803,16 +865,60 @@
       ["Zimbabwe", "ZWE", "🇿🇼"],
     ].sort((a, b) => a[0].localeCompare(b[0]));
 
-    function populateCountrySelect() {
+    function populateCountrySelect(filter = '') {
+      const wrapper = document.getElementById('countryWrapper');
+      if (!wrapper) return;
       const select = document.getElementById('countrySelect');
-      if (!select) return;
-      select.innerHTML = '<option value="">Country</option>';
-      COUNTRIES.forEach(([name, code, flag]) => {
+      const list = document.getElementById('countryList');
+      if (!list) return;
+
+      select.innerHTML = '';
+      list.innerHTML = '';
+
+      const lowerFilter = filter.toLowerCase();
+      const matches = COUNTRIES.filter(([name, code]) => {
+        return name.toLowerCase().includes(lowerFilter) || code.toLowerCase().includes(lowerFilter);
+      });
+
+      // Hidden select for form submission
+      const optDefault = document.createElement('option');
+      optDefault.value = '';
+      select.appendChild(optDefault);
+
+      matches.forEach(([name, code, flag]) => {
         const opt = document.createElement('option');
         opt.value = code;
         opt.textContent = `${flag}  ${name} (${code})`;
         select.appendChild(opt);
+
+        const li = document.createElement('li');
+        li.innerHTML = `${flag}  <strong>${name}</strong> (${code})`;
+        li.style.cursor = 'pointer';
+        li.addEventListener('click', () => {
+          select.value = code;
+          document.getElementById('countryInput').value = `${flag} ${name}`;
+          list.style.display = 'none';
+        });
+        list.appendChild(li);
       });
+
+      list.style.display = matches.length > 0 ? 'block' : 'none';
+    }
+
+    function saveSearchForm() {
+      const input = document.getElementById('postalInput');
+      const select = document.getElementById('countrySelect');
+      return {
+        postal: input ? input.value : '',
+        country: select ? select.value : ''
+      };
+    }
+
+    function restoreSearchForm(saved) {
+      const input = document.getElementById('postalInput');
+      const select = document.getElementById('countrySelect');
+      if (input) input.value = saved.postal || '';
+      if (select) select.value = saved.country || '';
     }
 
 
@@ -974,7 +1080,11 @@
               <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <select id="countrySelect"></select>
+            <div id="countryWrapper" class="country-wrapper">
+              <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
+              <select id="countrySelect"></select>
+              <ul id="countryList" class="country-list"></ul>
+            </div>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1086,7 +1196,11 @@
               <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <select id="countrySelect"></select>
+            <div id="countryWrapper" class="country-wrapper">
+              <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
+              <select id="countrySelect"></select>
+              <ul id="countryList" class="country-list"></ul>
+            </div>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1130,6 +1244,9 @@
     }
 
     async function loadWeather() {
+      // Save form state
+      const saved = saveSearchForm();
+
       const app = document.getElementById('app');
       app.innerHTML = `
         <div class="loading">
@@ -1146,6 +1263,9 @@
         window._lastWeatherData = data;
         render(data);
         updateRefreshTime();
+        // Restore form values
+        restoreSearchForm(saved);
+        populateCountrySelect();
       } catch (err) {
         console.error('Failed to load weather:', err);
         renderError('Could not fetch weather data. Please try again.');
@@ -1168,6 +1288,9 @@
         return;
       }
 
+      // Save form state before wiping the page
+      const saved = saveSearchForm();
+
       const app = document.getElementById('app');
       app.innerHTML = `
         <div class="loading">
@@ -1187,11 +1310,17 @@
         window._lastWeatherData = data;
         render(data);
         updateRefreshTime();
+        // Restore form values
+        restoreSearchForm(saved);
+        populateCountrySelect();
         if (errorEl) {
           errorEl.style.display = 'none';
         }
       } catch (err) {
         console.error('Search failed:', err);
+        // Restore form values on error too
+        restoreSearchForm(saved);
+        populateCountrySelect();
         renderSearchError(err.message || 'Could not find this location. Try a valid postal code and country code (e.g., US, DE, JP).');
       }
     }
@@ -1200,8 +1329,32 @@
     document.addEventListener('DOMContentLoaded', () => {
       populateCountrySelect();
       const postalInput = document.getElementById('postalInput');
+      const countryInput = document.getElementById('countryInput');
+      const countryList = document.getElementById('countryList');
       if (postalInput) {
         postalInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
+      }
+      if (countryInput && countryList) {
+        countryInput.addEventListener('input', (e) => {
+          populateCountrySelect(e.target.value);
+        });
+        countryInput.addEventListener('focus', () => {
+          populateCountrySelect(countryInput.value);
+          countryList.style.display = 'block';
+        });
+        countryInput.addEventListener('blur', () => {
+          setTimeout(() => { countryList.style.display = 'none'; }, 200);
+        });
+        // Click on select to open list
+        const countrySelect = document.getElementById('countrySelect');
+        if (countrySelect) {
+          countrySelect.addEventListener('click', (e) => {
+            e.preventDefault();
+            countryList.style.display = countryList.style.display === 'block' ? 'none' : 'block';
+            populateCountrySelect(countryInput.value);
+            countryInput.focus();
+          });
+        }
       }
     });
 
