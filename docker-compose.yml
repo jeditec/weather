@@ -1,6 +1,6 @@
 services:
   weather-dashboard:
-    build: .
+    image: ghcr.io/jeditec/weather:latest
     container_name: weather-dashboard
     restart: unless-stopped
     ports:
