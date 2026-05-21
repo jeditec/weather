@@ -519,63 +519,9 @@
       color: var(--text);
       padding: 8px;
     }
-    .country-wrapper {
-      position: relative;
-      min-width: 180px;
-    }
-    .country-input {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 14px;
-      color: var(--text);
-      font-size: 0.85rem;
-      font-family: inherit;
-      width: 100%;
-      transition: border-color 0.2s;
-    }
-    .country-input:focus {
+    .search-bar select:focus {
       outline: none;
       border-color: var(--accent);
-    }
-    .country-input::placeholder {
-      color: rgba(161, 161, 170, 0.5);
-      opacity: 0.5;
-    }
-    #countrySelect {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-      width: 1px;
-      height: 1px;
-    }
-    .country-list {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: #1a1a2e;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-      padding: 4px 0;
-      z-index: 100;
-      display: none;
-      margin-top: 4px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-    .country-list li {
-      padding: 8px 14px;
-      font-size: 0.85rem;
-      transition: background 0.15s;
-    }
-    .country-list li:hover {
-      background: rgba(96, 165, 250, 0.15);
-    }
-    .country-list li strong {
-      color: var(--accent);
     }
     .search-bar .search-btn {
       background: var(--accent);
@@ -626,11 +572,7 @@
         <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
       </div>
       <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-      <div id="countryWrapper" class="country-wrapper">
-        <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
-        <select id="countrySelect"></select>
-        <ul id="countryList" class="country-list"></ul>
-      </div>
+      <select id="countrySelect"></select>
       <button class="search-btn" onclick="searchWeather()">🔍</button>
       <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
     </div>
@@ -865,44 +807,22 @@
       ["Zimbabwe", "ZWE", "🇿🇼"],
     ].sort((a, b) => a[0].localeCompare(b[0]));
 
-    function populateCountrySelect(filter = '') {
-      const wrapper = document.getElementById('countryWrapper');
-      if (!wrapper) return;
+    function populateCountrySelect() {
       const select = document.getElementById('countrySelect');
-      const list = document.getElementById('countryList');
-      if (!list) return;
-
+      if (!select) return;
+      const selected = select.value;
       select.innerHTML = '';
-      list.innerHTML = '';
-
-      const lowerFilter = filter.toLowerCase();
-      const matches = COUNTRIES.filter(([name, code]) => {
-        return name.toLowerCase().includes(lowerFilter) || code.toLowerCase().includes(lowerFilter);
-      });
-
-      // Hidden select for form submission
       const optDefault = document.createElement('option');
       optDefault.value = '';
+      optDefault.textContent = 'Select country';
       select.appendChild(optDefault);
-
-      matches.forEach(([name, code, flag]) => {
+      COUNTRIES.forEach(([name, code, flag]) => {
         const opt = document.createElement('option');
         opt.value = code;
         opt.textContent = `${flag}  ${name} (${code})`;
         select.appendChild(opt);
-
-        const li = document.createElement('li');
-        li.innerHTML = `${flag}  <strong>${name}</strong> (${code})`;
-        li.style.cursor = 'pointer';
-        li.addEventListener('click', () => {
-          select.value = code;
-          document.getElementById('countryInput').value = `${flag} ${name}`;
-          list.style.display = 'none';
-        });
-        list.appendChild(li);
       });
-
-      list.style.display = matches.length > 0 ? 'block' : 'none';
+      if (selected) select.value = selected;
     }
 
     function saveSearchForm() {
@@ -920,6 +840,43 @@
       if (input) input.value = saved.postal || '';
       if (select) select.value = saved.country || '';
     }
+
+    // Country keyboard filtering
+    let countryFilterText = '';
+    let countryFilterTimer = null;
+
+    document.addEventListener('keydown', (e) => {
+      const select = document.getElementById('countrySelect');
+      if (!select) return;
+
+      // Only filter when select is focused
+      if (document.activeElement !== select) return;
+
+      // Ignore special keys
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape') return;
+
+      // Single letter/number key
+      if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) {
+        e.preventDefault();
+        countryFilterText += e.key.toLowerCase();
+
+        clearTimeout(countryFilterTimer);
+        countryFilterTimer = setTimeout(() => {
+          countryFilterText = '';
+        }, 1000);
+
+        const options = Array.from(select.options);
+        const idx = options.findIndex(opt => {
+          if (opt.value === '') return false;
+          const name = opt.text.toLowerCase();
+          return name.startsWith(countryFilterText) || name.includes(countryFilterText);
+        });
+
+        if (idx > 0) {
+          select.value = options[idx].value;
+        }
+      }
+    });
 
 
     // WMO Weather code mapping
@@ -1080,11 +1037,7 @@
               <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <div id="countryWrapper" class="country-wrapper">
-              <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
-              <select id="countrySelect"></select>
-              <ul id="countryList" class="country-list"></ul>
-            </div>
+            <select id="countrySelect"></select>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1196,11 +1149,7 @@
               <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <div id="countryWrapper" class="country-wrapper">
-              <input type="text" id="countryInput" class="country-input" placeholder="Search country..." autocomplete="off" />
-              <select id="countrySelect"></select>
-              <ul id="countryList" class="country-list"></ul>
-            </div>
+            <select id="countrySelect"></select>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1329,32 +1278,15 @@
     document.addEventListener('DOMContentLoaded', () => {
       populateCountrySelect();
       const postalInput = document.getElementById('postalInput');
-      const countryInput = document.getElementById('countryInput');
-      const countryList = document.getElementById('countryList');
+      const countrySelect = document.getElementById('countrySelect');
       if (postalInput) {
         postalInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
       }
-      if (countryInput && countryList) {
-        countryInput.addEventListener('input', (e) => {
-          populateCountrySelect(e.target.value);
+      // Focus country select to enable keyboard filtering
+      if (countrySelect) {
+        countrySelect.addEventListener('focus', () => {
+          countryFilterText = '';
         });
-        countryInput.addEventListener('focus', () => {
-          populateCountrySelect(countryInput.value);
-          countryList.style.display = 'block';
-        });
-        countryInput.addEventListener('blur', () => {
-          setTimeout(() => { countryList.style.display = 'none'; }, 200);
-        });
-        // Click on select to open list
-        const countrySelect = document.getElementById('countrySelect');
-        if (countrySelect) {
-          countrySelect.addEventListener('click', (e) => {
-            e.preventDefault();
-            countryList.style.display = countryList.style.display === 'block' ? 'none' : 'block';
-            populateCountrySelect(countryInput.value);
-            countryInput.focus();
-          });
-        }
       }
     });
 
