@@ -493,35 +493,22 @@
     .search-bar input:focus::placeholder {
       opacity: 0;
     }
-    .search-bar select {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 12px;
-      color: var(--text);
-      font-size: 0.85rem;
-      font-family: inherit;
-      width: 160px;
-      cursor: pointer;
-      transition: border-color 0.2s;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 10px center;
+    .search-bar input.list-input {
+      background:
+        var(--card),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+      background-origin: content-box;
+      background-clip: padding-box;
       padding-right: 32px;
+      cursor: pointer;
     }
-    .search-bar select:focus {
-      outline: none;
+    .search-bar input.list-input:focus {
       border-color: var(--accent);
-    }
-    .search-bar select option {
-      background: #1a1a2e;
-      color: var(--text);
-      padding: 8px;
-    }
-    .search-bar select:focus {
-      outline: none;
-      border-color: var(--accent);
+      background:
+        rgba(96,165,250,0.1),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2360a5fa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
+      background-origin: content-box;
+      background-clip: padding-box;
     }
     .search-bar .search-btn {
       background: var(--accent);
@@ -568,11 +555,12 @@
     <!-- Search Bar (always visible) -->
     <div class="search-bar">
       <div class="unit-toggle">
-        <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
-        <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+        <button class="unit-btn ${TEMP_UNIT === 'F' ? 'active' : ''}" id="unitF" onclick="setUnit('F')">°F</button>
+        <button class="unit-btn ${TEMP_UNIT === 'C' ? 'active' : ''}" id="unitC" onclick="setUnit('C')">°C</button>
       </div>
       <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-      <select id="countrySelect"></select>
+      <input type="text" class="list-input" id="countryInput" list="countryList" placeholder="Type country name" autocomplete="off" />
+      <datalist id="countryList"></datalist>
       <button class="search-btn" onclick="searchWeather()">🔍</button>
       <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
     </div>
@@ -609,6 +597,11 @@
       return Math.round(f);
     }
     function unitLabel() { return TEMP_UNIT === 'F' ? '°F' : '°C'; }
+
+    function mphToKmh(mph) { return Math.round(mph * 1.60934); }
+    function inToMm(inches) { return parseFloat((inches * 25.4).toFixed(1)); }
+    function windUnit() { return TEMP_UNIT === 'F' ? 'mph' : 'km/h'; }
+    function precipUnit() { return TEMP_UNIT === 'F' ? 'in' : 'mm'; }
 
     // Countries sorted alphabetically by name: [name, 3-letter code, emoji flag]
     const COUNTRIES = [
@@ -808,76 +801,43 @@
     ].sort((a, b) => a[0].localeCompare(b[0]));
 
     function populateCountrySelect() {
-      const select = document.getElementById('countrySelect');
-      if (!select) return;
-      const selected = select.value;
-      select.innerHTML = '';
-      const optDefault = document.createElement('option');
-      optDefault.value = '';
-      optDefault.textContent = 'Select country';
-      select.appendChild(optDefault);
+      const datalist = document.getElementById('countryList');
+      if (!datalist) return;
+      const currentValue = document.getElementById('countryInput')?.value || '';
+      datalist.innerHTML = '';
       COUNTRIES.forEach(([name, code, flag]) => {
         const opt = document.createElement('option');
         opt.value = code;
-        opt.textContent = `${flag}  ${name} (${code})`;
-        select.appendChild(opt);
+        opt.label = `${flag}  ${name}`;
+        datalist.appendChild(opt);
       });
-      if (selected) select.value = selected;
+      if (currentValue) {
+        document.getElementById('countryInput').value = currentValue;
+      }
     }
 
     function saveSearchForm() {
       const input = document.getElementById('postalInput');
-      const select = document.getElementById('countrySelect');
+      const country = document.getElementById('countryInput');
       return {
         postal: input ? input.value : '',
-        country: select ? select.value : ''
+        country: country ? country.value : ''
       };
     }
 
     function restoreSearchForm(saved) {
       const input = document.getElementById('postalInput');
-      const select = document.getElementById('countrySelect');
+      const country = document.getElementById('countryInput');
       if (input) input.value = saved.postal || '';
-      if (select) select.value = saved.country || '';
-    }
-
-    // Country keyboard filtering
-    let countryFilterText = '';
-    let countryFilterTimer = null;
-
-    function applyCountryFilter(e) {
-      const select = document.getElementById('countrySelect');
-      if (!select) return;
-
-      // Only filter when select is focused
-      if (document.activeElement !== select) return;
-
-      // Ignore special keys
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape') return;
-
-      // Single letter/number key
-      if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) {
-        e.preventDefault();
-        countryFilterText += e.key.toLowerCase();
-
-        clearTimeout(countryFilterTimer);
-        countryFilterTimer = setTimeout(() => {
-          countryFilterText = '';
-        }, 1000);
-
-        const options = Array.from(select.options);
-        const idx = options.findIndex(opt => {
-          if (opt.value === '') return false;
-          const name = opt.text.toLowerCase();
-          return name.startsWith(countryFilterText) || name.includes(countryFilterText);
-        });
-
-        if (idx > 0) {
-          select.value = options[idx].value;
+      if (country) {
+        country.value = saved.country || '';
+        // If countryInput has a value like "US", try to match it to a full name for display
+        if (saved.country) {
+          const match = COUNTRIES.find(c => c[1] === saved.country);
+          if (match) country.value = `${match[2]}  ${match[0]} (${match[1]})`;
         }
       }
     }
-
 
     // WMO Weather code mapping
     const WMO_CODES = {
@@ -1033,11 +993,12 @@
           <!-- Search Bar -->
           <div class="search-bar">
             <div class="unit-toggle">
-              <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
-              <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+              <button class="unit-btn ${TEMP_UNIT === 'F' ? 'active' : ''}" id="unitF" onclick="setUnit('F')">°F</button>
+              <button class="unit-btn ${TEMP_UNIT === 'C' ? 'active' : ''}" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <select id="countrySelect"></select>
+            <input type="text" class="list-input" id="countryInput" list="countryList" placeholder="Type country name" autocomplete="off" />
+            <datalist id="countryList"></datalist>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1084,7 +1045,7 @@
             <div class="detail-card">
               <div class="icon">💨</div>
               <div class="label">Wind</div>
-              <div class="value">${Math.round(current.wind_speed_10m)}<span style="font-size:0.8rem"> mph</span></div>
+              <div class="value">${TEMP_UNIT === 'F' ? Math.round(current.wind_speed_10m) : mphToKmh(current.wind_speed_10m)}<span style="font-size:0.8rem"> ${windUnit()}</span></div>
               <div class="sub">${windDirection(current.wind_direction_10m)} · Gusts light</div>
             </div>
             <div class="detail-card">
@@ -1098,7 +1059,7 @@
             <div class="detail-card">
               <div class="icon">🌧️</div>
               <div class="label">Precipitation</div>
-              <div class="value">${current.precipitation}<span style="font-size:0.8rem"> in</span></div>
+              <div class="value">${TEMP_UNIT === 'F' ? current.precipitation : inToMm(current.precipitation)}<span style="font-size:0.8rem"> ${precipUnit()}</span></div>
               <div class="sub">Last hour</div>
             </div>
             <div class="detail-card">
@@ -1132,8 +1093,6 @@
           </div>
         </div>
       `;
-      // Restore correct active unit button after re-render
-      setTimeout(() => setUnit(TEMP_UNIT), 0);
       // Populate country dropdown after DOM update
       setTimeout(populateCountrySelect, 10);
     }
@@ -1145,11 +1104,12 @@
           <!-- Search Bar -->
           <div class="search-bar">
             <div class="unit-toggle">
-              <button class="unit-btn active" id="unitF" onclick="setUnit('F')">°F</button>
-              <button class="unit-btn" id="unitC" onclick="setUnit('C')">°C</button>
+              <button class="unit-btn ${TEMP_UNIT === 'F' ? 'active' : ''}" id="unitF" onclick="setUnit('F')">°F</button>
+              <button class="unit-btn ${TEMP_UNIT === 'C' ? 'active' : ''}" id="unitC" onclick="setUnit('C')">°C</button>
             </div>
             <input type="text" id="postalInput" placeholder="Postal code" autocomplete="off" />
-            <select id="countrySelect"></select>
+            <input type="text" class="list-input" id="countryInput" list="countryList" placeholder="Type country name" autocomplete="off" />
+            <datalist id="countryList"></datalist>
             <button class="search-btn" onclick="searchWeather()">🔍</button>
             <button class="search-btn" style="background:var(--text-dim)" onclick="loadWeather()" title="Reset to default">↺</button>
           </div>
@@ -1174,7 +1134,6 @@
           </div>
         </div>
       `;
-      setTimeout(() => setUnit(TEMP_UNIT), 0);
       setTimeout(populateCountrySelect, 10);
     }
 
@@ -1223,11 +1182,11 @@
 
     async function searchWeather() {
       const postalInput = document.getElementById('postalInput');
-      const countrySelect = document.getElementById('countrySelect');
+      const countryInput = document.getElementById('countryInput');
       const errorEl = document.getElementById('searchError');
 
       const postal = postalInput ? postalInput.value.trim() : '';
-      const country = countrySelect ? countrySelect.value : '';
+      const country = countryInput ? countryInput.value.trim().toUpperCase().replace(/[^A-Z]/g, '') : '';
 
       if (!postal || !country) {
         if (errorEl) {
@@ -1278,15 +1237,12 @@
     document.addEventListener('DOMContentLoaded', () => {
       populateCountrySelect();
       const postalInput = document.getElementById('postalInput');
-      const countrySelect = document.getElementById('countrySelect');
+      const countryInput = document.getElementById('countryInput');
       if (postalInput) {
         postalInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
       }
-      if (countrySelect) {
-        countrySelect.addEventListener('focus', () => {
-          countryFilterText = '';
-        });
-        countrySelect.addEventListener('keydown', applyCountryFilter);
+      if (countryInput) {
+        countryInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
       }
     });
 
